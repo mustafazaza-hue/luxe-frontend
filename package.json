@@ -9,9 +9,25 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@fortawesome/fontawesome-svg-core": "^7.1.0",
+    "@fortawesome/free-brands-svg-icons": "^7.1.0",
+    "@fortawesome/free-regular-svg-icons": "^7.1.0",
+    "@fortawesome/free-solid-svg-icons": "^7.1.0",
+    "@fortawesome/react-fontawesome": "^3.1.1",
+    "@google/model-viewer": "^4.1.0",
+    "@hookform/resolvers": "^5.2.2",
+    "axios": "^1.13.2",
     "next": "16.1.1",
+    "plotly.js": "^3.3.1",
+    "plotly.js-dist-min": "^3.3.1",
     "react": "19.2.3",
-    "react-dom": "19.2.3"
+    "react-dom": "19.2.3",
+    "react-hook-form": "^7.69.0",
+    "react-hot-toast": "^2.6.0",
+    "react-plotly.js": "^2.6.0",
+    "recharts": "^3.6.0",
+    "sweetalert2": "^11.26.17",
+    "yup": "^1.7.1"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
