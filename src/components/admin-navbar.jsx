@@ -242,13 +242,14 @@ export default function AdminNavbar() {
                     
                     <div className="border-t border-gray-200 my-1"></div>
                     
-                    <button
+                    <a
+                    href='/adminlogin'
                       onClick={handleLogout}
                       className="flex items-center w-full px-4 py-3 text-left text-red-600 hover:bg-red-50 transition-colors"
                     >
                       <FontAwesomeIcon icon={faSignOutAlt} className="mr-3" />
                       <span>Logout</span>
-                    </button>
+                    </a>
                   </div>
                 </div>
               )}

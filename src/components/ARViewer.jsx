@@ -11,7 +11,8 @@ import {
   faExclamationTriangle,
   faDownload,
   faArrowsAlt,
-  faCompressAlt
+  faCompressAlt,
+  faInfoCircle
 } from "@fortawesome/free-solid-svg-icons";
 
 export default function ARViewer({ product, isOpen, onClose }) {
@@ -20,15 +21,34 @@ export default function ARViewer({ product, isOpen, onClose }) {
   const [error, setError] = useState(null);
   const [isIOS, setIsIOS] = useState(false);
   const [isAndroid, setIsAndroid] = useState(false);
+  const [browser, setBrowser] = useState("");
   const [scale, setScale] = useState(1);
+  const [webXRSupported, setWebXRSupported] = useState(false);
   const modelViewerRef = useRef(null);
   
-  // تحديد نوع الجهاز
+  // تحديد نوع الجهاز والمتصفح
   useEffect(() => {
     if (isOpen) {
       const ua = navigator.userAgent;
-      setIsIOS(/iPad|iPhone|iPod/.test(ua));
-      setIsAndroid(/Android/.test(ua));
+      const isIOSDevice = /iPad|iPhone|iPod/.test(ua);
+      const isAndroidDevice = /Android/.test(ua);
+      
+      setIsIOS(isIOSDevice);
+      setIsAndroid(isAndroidDevice);
+      
+      // تحديد المتصفح
+      if (ua.includes("Chrome")) setBrowser("Chrome");
+      else if (ua.includes("Safari") && !ua.includes("Chrome")) setBrowser("Safari");
+      else if (ua.includes("Firefox")) setBrowser("Firefox");
+      else if (ua.includes("Edge")) setBrowser("Edge");
+      
+      // التحقق من دعم WebXR
+      if ('xr' in navigator) {
+        navigator.xr.isSessionSupported('immersive-ar').then((supported) => {
+          setWebXRSupported(supported);
+          console.log("WebXR supported:", supported);
+        }).catch(() => setWebXRSupported(false));
+      }
     }
   }, [isOpen]);
 
@@ -36,20 +56,37 @@ export default function ARViewer({ product, isOpen, onClose }) {
   useEffect(() => {
     if (isOpen) {
       setLoading(true);
-      setArMode(false);
+      setError(null);
+      
+      // Cleanup function
+      const cleanup = () => {
+        const scripts = document.querySelectorAll('script[src*="model-viewer"]');
+        scripts.forEach(script => script.remove());
+        window.modelViewerLoaded = false;
+      };
       
       // تحميل مكتبة Model Viewer
       const loadModelViewer = () => {
+        cleanup(); // تنظيف أي نسخ سابقة
+        
         if (typeof window !== 'undefined' && !window.modelViewerLoaded) {
           const script = document.createElement('script');
           script.type = 'module';
-          script.src = 'https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js';
+          script.src = 'https://unpkg.com/@google/model-viewer@1.12.0/dist/model-viewer.min.js';
+          script.crossOrigin = 'anonymous';
           script.onload = () => {
             window.modelViewerLoaded = true;
-            // تأخير بسيط ثم تشغيل AR تلقائياً
+            console.log('Model Viewer loaded successfully');
+            
+            // إضافة شهادة SSL للـ WebXR على Android
+            if (isAndroid && window.location.protocol !== 'https:') {
+              console.warn('AR requires HTTPS on Android. Currently using:', window.location.protocol);
+            }
+            
+            // تشغيل AR بعد تحميل المكتبة
             setTimeout(() => {
               activateAR();
-            }, 500);
+            }, 800);
           };
           script.onerror = () => {
             console.error('Failed to load Model Viewer library');
@@ -58,18 +95,20 @@ export default function ARViewer({ product, isOpen, onClose }) {
           };
           document.head.appendChild(script);
         } else {
-          // إذا المكتبة محملة مسبقاً، تشغيل AR مباشرة
           setTimeout(() => {
             activateAR();
-          }, 300);
+          }, 500);
         }
       };
 
       loadModelViewer();
+      
+      // Cleanup on unmount
+      return cleanup;
     }
   }, [isOpen]);
 
-  // تشغيل AR تلقائياً
+  // تشغيل AR مع تحسينات للـ Android
   const activateAR = () => {
     if (!product?.arGlb) {
       setError('No AR model available for this product');
@@ -79,29 +118,57 @@ export default function ARViewer({ product, isOpen, onClose }) {
 
     setLoading(false);
     
-    // استخدام timeout للتأكد من تحميل عنصر model-viewer
+    // تأخير للتأكد من تحميل عنصر model-viewer
     setTimeout(() => {
       const modelViewer = document.querySelector('model-viewer');
       if (modelViewer) {
-        if (modelViewer.activateAR) {
-          modelViewer.activateAR();
-          setArMode(true);
-        } else {
-          // محاولة إيجاد زر AR وإضغاطه تلقائياً
-          const shadowRoot = modelViewer.shadowRoot;
-          if (shadowRoot) {
-            const arButton = shadowRoot.querySelector('[ar-button], .ar-button, button[slot="ar-button"]');
-            if (arButton) {
-              arButton.click();
-              setArMode(true);
-            }
-          }
+        
+        // إعدادات خاصة للـ Android
+        if (isAndroid) {
+          modelViewer.setAttribute('ar', 'true');
+          modelViewer.setAttribute('ar-modes', 'webxr scene-viewer');
+          modelViewer.setAttribute('webxr', '');
+          modelViewer.setAttribute('interaction-prompt', 'auto');
           
-          // محاولة أخرى للزر
-          const arButton = modelViewer.querySelector('[slot="ar-button"], .ar-button');
-          if (arButton) {
-            arButton.click();
+          // محاولة تفعيل AR تلقائياً
+          setTimeout(() => {
+            if (modelViewer.canActivateAR) {
+              modelViewer.activateAR();
+              setArMode(true);
+            } else {
+              // محاولة يدوية للزر
+              try {
+                const shadowRoot = modelViewer.shadowRoot;
+                if (shadowRoot) {
+                  const arButton = shadowRoot.querySelector('[ar-button], .ar-button');
+                  if (arButton) {
+                    arButton.click();
+                    setArMode(true);
+                    return;
+                  }
+                }
+                
+                // إذا فشل، إظهار تعليمات للمستخدم
+                setError('AR requires manual activation on Android. Please tap the AR button when it appears.');
+              } catch (err) {
+                console.log('Error accessing shadow DOM:', err);
+              }
+            }
+          }, 1500);
+          
+        } else {
+          // إعدادات iOS والأنظمة الأخرى
+          modelViewer.setAttribute('ar-modes', 'scene-viewer quick-look webxr');
+          
+          if (modelViewer.activateAR) {
+            modelViewer.activateAR();
             setArMode(true);
+          } else {
+            setTimeout(() => {
+              const arButton = document.querySelector('#auto-ar-button');
+              if (arButton) arButton.click();
+              setArMode(true);
+            }, 1200);
           }
         }
       }
@@ -111,16 +178,19 @@ export default function ARViewer({ product, isOpen, onClose }) {
   // إدارة زر الإغلاق
   const handleClose = () => {
     if (arMode) {
-      // محاولة إغلاق وضع AR أولاً
       const modelViewer = document.querySelector('model-viewer');
       if (modelViewer && modelViewer.dismissPoster) {
         modelViewer.dismissPoster();
       }
       setArMode(false);
-      setTimeout(onClose, 300);
-    } else {
-      onClose();
     }
+    
+    // تنظيف وإغلاق
+    const scripts = document.querySelectorAll('script[src*="model-viewer"]');
+    scripts.forEach(script => script.remove());
+    window.modelViewerLoaded = false;
+    
+    setTimeout(onClose, 300);
   };
 
   // كود الحالة الافتراضية عند عدم وجود مودل AR
@@ -154,7 +224,9 @@ export default function ARViewer({ product, isOpen, onClose }) {
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-black z-40">
           <div className="w-16 h-16 border-4 border-white/30 border-t-[var(--luxury-gold)] rounded-full animate-spin mb-4"></div>
           <p className="text-white text-lg font-medium">Loading AR Experience...</p>
-          <p className="text-white/60 text-sm mt-2">AR will launch automatically</p>
+          <p className="text-white/60 text-sm mt-2">
+            {isAndroid ? "Using WebXR for Android" : "Preparing AR environment"}
+          </p>
         </div>
       )}
 
@@ -162,8 +234,23 @@ export default function ARViewer({ product, isOpen, onClose }) {
       {error && !loading && (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-black z-40">
           <FontAwesomeIcon icon={faExclamationTriangle} className="text-red-500 text-5xl mb-4" />
-          <p className="text-white text-lg font-medium mb-2">AR Unavailable</p>
-          <p className="text-white/60 text-center max-w-md mb-6">{error}</p>
+          <p className="text-white text-lg font-medium mb-2">AR Experience</p>
+          <p className="text-white/60 text-center max-w-md mb-4">{error}</p>
+          
+          {/* إظهار معلومات تقنية للمستخدم */}
+          <div className="bg-black/50 p-4 rounded-lg mb-4 max-w-md">
+            <div className="flex items-center mb-2">
+              <FontAwesomeIcon icon={faInfoCircle} className="text-[var(--luxury-gold)] mr-2" />
+              <span className="text-white font-medium">Technical Info:</span>
+            </div>
+            <div className="text-white/70 text-sm space-y-1">
+              <div>Device: {isIOS ? 'iOS' : isAndroid ? 'Android' : 'Desktop'}</div>
+              <div>Browser: {browser}</div>
+              <div>WebXR Supported: {webXRSupported ? 'Yes' : 'No'}</div>
+              <div>HTTPS: {window.location.protocol === 'https:' ? 'Yes' : 'No (required for Android AR)'}</div>
+            </div>
+          </div>
+          
           <div className="flex space-x-4">
             <button
               onClick={onClose}
@@ -172,7 +259,11 @@ export default function ARViewer({ product, isOpen, onClose }) {
               Close
             </button>
             <button
-              onClick={activateAR}
+              onClick={() => {
+                setError(null);
+                setLoading(true);
+                setTimeout(activateAR, 500);
+              }}
               className="bg-[var(--luxury-gold)] hover:bg-opacity-90 text-white px-6 py-2 rounded-lg"
             >
               Retry
@@ -189,7 +280,7 @@ export default function ARViewer({ product, isOpen, onClose }) {
             src={product?.arGlb || defaultARModel}
             alt={`AR Model of ${product?.name || 'Product'}`}
             ar
-            ar-modes="scene-viewer quick-look webxr"
+            ar-modes={isAndroid ? "webxr scene-viewer" : "scene-viewer quick-look webxr"}
             ar-scale="fixed"
             camera-controls
             auto-rotate
@@ -197,15 +288,17 @@ export default function ARViewer({ product, isOpen, onClose }) {
             environment-image="neutral"
             exposure="1"
             shadow-intensity="1"
+            interaction-prompt="auto"
+            interaction-policy="allow-when-focused"
             style={{
               width: '100%',
               height: '100%',
               '--progress-bar-color': '#D4AF37',
               '--progress-bar-height': '3px',
               '--poster-color': 'transparent',
+              '--ar-button-background': '#D4AF37',
+              '--ar-button-color': '#000',
             }}
-            // إعدادات إضافية لتفعيل AR تلقائياً
-        
             autoplay
             xr-environment
           >
@@ -213,36 +306,35 @@ export default function ARViewer({ product, isOpen, onClose }) {
             <button 
               slot="ar-button" 
               id="auto-ar-button"
-              style={{ display: 'none' }}
+              style={{ 
+                position: 'absolute',
+                bottom: '20px',
+                right: '20px',
+                zIndex: '1000',
+                backgroundColor: '#D4AF37',
+                color: '#000',
+                border: 'none',
+                padding: '10px 20px',
+                borderRadius: '8px',
+                fontWeight: 'bold',
+                cursor: 'pointer',
+                display: isAndroid ? 'block' : 'none'
+              }}
+              onClick={(e) => {
+                e.preventDefault();
+                const modelViewer = document.querySelector('model-viewer');
+                if (modelViewer && modelViewer.activateAR) {
+                  modelViewer.activateAR();
+                  setArMode(true);
+                }
+              }}
             >
-              Launch AR
+              {isAndroid ? 'TAP FOR AR' : 'LAUNCH AR'}
             </button>
             
-            {/* Progress Bar Customization */}
             <div className="progress-bar" slot="progress-bar">
-              <div className="update-bar" style={{ 
-                backgroundColor: '#D4AF37',
-                height: '3px'
-              }}></div>
+              <div className="update-bar"></div>
             </div>
-            
-            {/* Custom AR Button with Auto-click */}
-            <script type="module">
-              {`
-                setTimeout(() => {
-                  const modelViewer = document.querySelector('model-viewer');
-                  if (modelViewer) {
-                    // محاولة تفعيل AR تلقائياً
-                    setTimeout(() => {
-                      const arButton = modelViewer.shadowRoot?.querySelector('[ar-button]');
-                      if (arButton) {
-                        arButton.click();
-                      }
-                    }, 1000);
-                  }
-                }, 500);
-              `}
-            </script>
           </model-viewer>
 
           {/* Instructions Overlay */}
@@ -255,8 +347,22 @@ export default function ARViewer({ product, isOpen, onClose }) {
           ) : (
             <div className="absolute bottom-24 left-1/2 transform -translate-x-1/2 bg-black/70 text-white p-4 rounded-xl max-w-sm text-center">
               <FontAwesomeIcon icon={faDesktop} className="text-xl mb-2" />
-              <p className="font-medium">AR will launch automatically</p>
-              <p className="text-sm text-white/60 mt-1">If not, tap the AR button in the viewer</p>
+              {isAndroid ? (
+                <>
+                  <p className="font-medium">AR requires manual activation</p>
+                  <p className="text-sm text-white/60 mt-1">
+                    {webXRSupported 
+                      ? 'Tap the yellow AR button to start' 
+                      : 'Your browser may not support WebXR'
+                    }
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="font-medium">AR will launch automatically</p>
+                  <p className="text-sm text-white/60 mt-1">If not, tap the AR button in the viewer</p>
+                </>
+              )}
             </div>
           )}
 
@@ -299,10 +405,20 @@ export default function ARViewer({ product, isOpen, onClose }) {
                 </li>
               )}
               {isAndroid && (
-                <li className="flex items-start">
-                  <span className="inline-block w-2 h-2 bg-[var(--luxury-gold)] rounded-full mt-1 mr-2"></span>
-                  <span>Use Chrome for Android AR</span>
-                </li>
+                <>
+                  <li className="flex items-start">
+                    <span className="inline-block w-2 h-2 bg-[var(--luxury-gold)] rounded-full mt-1 mr-2"></span>
+                    <span>Use Chrome 81+ for Android AR</span>
+                  </li>
+                  <li className="flex items-start">
+                    <span className="inline-block w-2 h-2 bg-[var(--luxury-gold)] rounded-full mt-1 mr-2"></span>
+                    <span>HTTPS connection required</span>
+                  </li>
+                  <li className="flex items-start">
+                    <span className="inline-block w-2 h-2 bg-[var(--luxury-gold)] rounded-full mt-1 mr-2"></span>
+                    <span>Tap the yellow AR button</span>
+                  </li>
+                </>
               )}
               <li className="flex items-start">
                 <span className="inline-block w-2 h-2 bg-[var(--luxury-gold)] rounded-full mt-1 mr-2"></span>

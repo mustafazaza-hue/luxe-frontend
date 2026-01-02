@@ -5,7 +5,7 @@ export const productsApi = {
   // Fetch featured products
   getFeaturedProducts: async () => {
     try {
-      const response = await apiClient.get("/Products/featured");
+      const response = await apiClient.get("/Products/featured"); // هذا صحيح الآن
 
       // Add complete image URLs
       return response.map((product) => ({

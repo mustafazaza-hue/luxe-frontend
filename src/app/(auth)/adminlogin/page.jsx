@@ -23,6 +23,7 @@ import {
   faExclamationCircle,
   faCheckCircle,
 } from "@fortawesome/free-solid-svg-icons";
+import { authApi } from "@/api/auth"; // استيراد من الملف الصحيح
 
 export default function AdminLogin() {
   const router = useRouter();
@@ -111,7 +112,7 @@ export default function AdminLogin() {
     
     // حالة تسجيل الدخول الناجح بدون توكن (تطوير/اختبار)
     if (data.email || data.id) {
-      localStorage.setItem("token", "demo-token-" + Date.now());
+      localStorage.setItem("token", data.token || `demo-${Date.now()}`);
       localStorage.setItem("user", JSON.stringify(data));
       localStorage.setItem("userType", "admin");
       handleSuccessfulLogin(data);
@@ -124,32 +125,11 @@ export default function AdminLogin() {
 
   const handleRegularLogin = async () => {
     try {
-      // المحاولة باستخدام Auth/admin/login endpoint أولاً
-      const response = await fetch("http://localhost:5186/api/Auth/admin/login", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          email: formData.email,
-          password: formData.password,
-        }),
-      });
+      // استخدام authApi من الملف المنفصل
+      const response = await authApi.adminLogin(formData.email, formData.password);
+      console.log("Auth admin login response via authApi:", response);
 
-      const data = await response.json();
-      console.log("Auth admin login response:", data);
-
-      if (!response.ok) {
-        if (response.status === 400) {
-          // إذا كان الخطأ 400، جرب AdminUsers endpoint
-          console.log("Trying AdminUsers endpoint...");
-          await tryAdminUsersLogin();
-          return;
-        }
-        throw new Error(data.message || "Login failed");
-      }
-
-      const result = handleLoginResponse(data);
+      const result = handleLoginResponse(response);
       
       if (result === 'UNKNOWN') {
         // إذا لم يتم التعرف على الاستجابة، حاول مع AdminUsers
@@ -158,37 +138,30 @@ export default function AdminLogin() {
       }
     } catch (error) {
       console.error("Auth admin login error:", error);
+      
+      // إذا كان هناك خطأ 400 أو خطأ في الشبكة، حاول مع AdminUsers
+      if (error.response?.status === 400 || error.message?.includes("Failed to fetch") || error.message?.includes("Network")) {
+        console.log("Trying AdminUsers endpoint...");
+        await tryAdminUsersLogin();
+        return;
+      }
+      
       throw error;
     }
   };
 
   const tryAdminUsersLogin = async () => {
     try {
-      const response = await fetch("http://localhost:5186/api/AdminUsers/Login", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          email: formData.email,
-          password: formData.password,
-        }),
-      });
+      const response = await authApi.adminUsersLogin(formData.email, formData.password);
+      console.log("AdminUsers login response:", response);
 
-      const data = await response.json();
-      console.log("AdminUsers login response:", data);
-
-      if (!response.ok) {
-        throw new Error(data.message || "AdminUsers login failed");
-      }
-
-      if (data.id || data.email) {
+      if (response.id || response.email) {
         // حفظ بيانات المستخدم
-        localStorage.setItem("token", data.token || "demo-token-" + Date.now());
-        localStorage.setItem("user", JSON.stringify(data));
+        localStorage.setItem("token", response.token || `demo-${Date.now()}`);
+        localStorage.setItem("user", JSON.stringify(response));
         localStorage.setItem("userType", "admin");
         
-        handleSuccessfulLogin(data);
+        handleSuccessfulLogin(response);
       } else {
         throw new Error("Invalid response from AdminUsers endpoint");
       }
@@ -200,30 +173,15 @@ export default function AdminLogin() {
 
   const handle2FALogin = async () => {
     try {
-      const response = await fetch("http://localhost:5186/api/Auth/admin/verify-2fa", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          email: formData.email,
-          code: twoFactor,
-        }),
-      });
+      const response = await authApi.verify2FA(formData.email, twoFactor);
+      console.log("2FA verification response:", response);
 
-      const data = await response.json();
-      console.log("2FA verification response:", data);
-
-      if (!response.ok) {
-        throw new Error(data.message || "Invalid verification code");
-      }
-
-      if (data.token) {
-        localStorage.setItem("token", data.token);
-        localStorage.setItem("user", JSON.stringify(data.user || data));
+      if (response.token) {
+        localStorage.setItem("token", response.token);
+        localStorage.setItem("user", JSON.stringify(response.user || response));
         localStorage.setItem("userType", "admin");
         
-        handleSuccessfulLogin(data);
+        handleSuccessfulLogin(response);
       } else {
         throw new Error("Invalid verification response");
       }
@@ -241,18 +199,24 @@ export default function AdminLogin() {
   };
 
   const handleLoginError = (error) => {
-    console.log("Login error details:", error.message);
+    console.log("Login error details:", error);
     
-    if (error.message.includes("فشل تسجيل الدخول")) {
+    if (error.message?.includes("فشل تسجيل الدخول")) {
       setError(error.message);
-    } else if (error.message.includes("400")) {
+    } else if (error.response?.status === 400) {
       setError("بيانات الاعتماد غير صحيحة. يرجى التحقق من البريد الإلكتروني وكلمة المرور");
-    } else if (error.message.includes("401")) {
+    } else if (error.response?.status === 401) {
       setError("غير مصرح. يرجى التحقق من صلاحياتك");
-    } else if (error.message.includes("429")) {
+    } else if (error.response?.status === 404) {
+      setError("الخادم غير متوفر. الرجاء التحقق من اتصال الشبكة");
+    } else if (error.response?.status === 429) {
       setError("لقد تجاوزت عدد محاولات تسجيل الدخول. يرجى المحاولة بعد دقيقة");
-    } else if (error.message.includes("Invalid response from server")) {
+    } else if (error.message?.includes("Failed to fetch") || error.message?.includes("Network Error")) {
+      setError("تعذر الاتصال بالخادم. الرجاء التحقق من اتصال الإنترنت وتأكد من تشغيل الخادم");
+    } else if (error.message?.includes("Invalid response from server")) {
       setError("استجابة غير متوقعة من الخادم. يرجى المحاولة مرة أخرى");
+    } else if (error.message) {
+      setError(error.message);
     } else {
       setError("حدث خطأ في الخادم. يرجى المحاولة مرة أخرى لاحقاً");
     }
@@ -268,7 +232,8 @@ export default function AdminLogin() {
     setError("");
     
     try {
-      const response = await fetch("http://localhost:5186/api/Auth/forgot-password", {
+      // يمكنك إضافة دالة forgotPassword في authApi.js
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5186"}/api/Auth/forgot-password`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -635,13 +600,16 @@ export default function AdminLogin() {
             {/* Debug Info */}
             <div className="mt-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
               <p className="text-xs text-gray-600 mb-1">
-                <strong>Debug Info:</strong> Using direct fetch calls
+                <strong>Debug Info:</strong> Using authApi with Axios
               </p>
               <p className="text-xs text-gray-500">
-                Endpoints: /api/Auth/admin/login, /api/AdminUsers/Login
+                API URL: {process.env.NEXT_PUBLIC_API_URL || "http://localhost:5186"}
               </p>
               <p className="text-xs text-gray-500 mt-1">
                 2FA Mode: {requires2FA ? "Active" : "Inactive"}
+              </p>
+              <p className="text-xs text-gray-500 mt-1">
+                Using: Centralized authApi module
               </p>
             </div>
 
@@ -721,7 +689,7 @@ export default function AdminLogin() {
           <div className="mt-6 text-center">
             <div className="inline-flex items-center space-x-2 text-sm text-gray-500">
               <FontAwesomeIcon icon={faServer} />
-              <span>API Base URL: http://localhost:5186/api</span>
+              <span>API Base URL: {process.env.NEXT_PUBLIC_API_URL || "http://localhost:5186"}</span>
             </div>
           </div>
         </div>

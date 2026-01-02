@@ -259,12 +259,12 @@ export default function CartPage() {
       return;
     }
     
-    const token = localStorage.getItem('authToken');
-    if (!token) {
-      alert('Please login to proceed to checkout');
-      window.location.href = '/login?redirect=/cart';
-      return;
-    }
+    // const token = localStorage.getItem('authToken');
+    // if (!token) {
+    //   alert('Please login to proceed to checkout');
+    //   window.location.href = '/login?redirect=/cart';
+    //   return;
+    // }
     
     window.location.href = '/checkout';
   };
