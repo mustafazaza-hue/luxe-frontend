@@ -12,7 +12,9 @@ import {
   faDownload,
   faArrowsAlt,
   faCompressAlt,
-  faInfoCircle
+  faInfoCircle,
+  faCamera,
+  faArrowRotateRight
 } from "@fortawesome/free-solid-svg-icons";
 
 export default function ARViewer({ product, isOpen, onClose }) {
@@ -24,6 +26,8 @@ export default function ARViewer({ product, isOpen, onClose }) {
   const [browser, setBrowser] = useState("");
   const [scale, setScale] = useState(1);
   const [webXRSupported, setWebXRSupported] = useState(false);
+  const [requiresHTTPS, setRequiresHTTPS] = useState(false);
+  const [manualActivation, setManualActivation] = useState(false);
   const modelViewerRef = useRef(null);
   
   // تحديد نوع الجهاز والمتصفح
@@ -48,15 +52,25 @@ export default function ARViewer({ product, isOpen, onClose }) {
           setWebXRSupported(supported);
           console.log("WebXR supported:", supported);
         }).catch(() => setWebXRSupported(false));
+      } else {
+        setWebXRSupported(false);
+      }
+      
+      // التحقق من HTTPS
+      const isHTTPS = window.location.protocol === 'https:';
+      if (isAndroid && !isHTTPS) {
+        setRequiresHTTPS(true);
+        setError('AR requires HTTPS on Android. Please access via HTTPS://');
       }
     }
   }, [isOpen]);
 
-  // تحميل مكتبة Model Viewer تلقائياً عند فتح AR
+  // تحميل مكتبة Model Viewer
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && !requiresHTTPS) {
       setLoading(true);
       setError(null);
+      setManualActivation(false);
       
       // Cleanup function
       const cleanup = () => {
@@ -67,7 +81,7 @@ export default function ARViewer({ product, isOpen, onClose }) {
       
       // تحميل مكتبة Model Viewer
       const loadModelViewer = () => {
-        cleanup(); // تنظيف أي نسخ سابقة
+        cleanup();
         
         if (typeof window !== 'undefined' && !window.modelViewerLoaded) {
           const script = document.createElement('script');
@@ -77,16 +91,9 @@ export default function ARViewer({ product, isOpen, onClose }) {
           script.onload = () => {
             window.modelViewerLoaded = true;
             console.log('Model Viewer loaded successfully');
-            
-            // إضافة شهادة SSL للـ WebXR على Android
-            if (isAndroid && window.location.protocol !== 'https:') {
-              console.warn('AR requires HTTPS on Android. Currently using:', window.location.protocol);
-            }
-            
-            // تشغيل AR بعد تحميل المكتبة
             setTimeout(() => {
-              activateAR();
-            }, 800);
+              initializeARViewer();
+            }, 500);
           };
           script.onerror = () => {
             console.error('Failed to load Model Viewer library');
@@ -96,8 +103,8 @@ export default function ARViewer({ product, isOpen, onClose }) {
           document.head.appendChild(script);
         } else {
           setTimeout(() => {
-            activateAR();
-          }, 500);
+            initializeARViewer();
+          }, 300);
         }
       };
 
@@ -106,10 +113,10 @@ export default function ARViewer({ product, isOpen, onClose }) {
       // Cleanup on unmount
       return cleanup;
     }
-  }, [isOpen]);
+  }, [isOpen, requiresHTTPS]);
 
-  // تشغيل AR مع تحسينات للـ Android
-  const activateAR = () => {
+  // تهيئة AR Viewer
+  const initializeARViewer = () => {
     if (!product?.arGlb) {
       setError('No AR model available for this product');
       setLoading(false);
@@ -118,61 +125,79 @@ export default function ARViewer({ product, isOpen, onClose }) {
 
     setLoading(false);
     
-    // تأخير للتأكد من تحميل عنصر model-viewer
+    // تأخير للتأكد من تحميل العنصر
     setTimeout(() => {
       const modelViewer = document.querySelector('model-viewer');
       if (modelViewer) {
+        console.log('Model Viewer element found');
         
-        // إعدادات خاصة للـ Android
-        if (isAndroid) {
-          modelViewer.setAttribute('ar', 'true');
-          modelViewer.setAttribute('ar-modes', 'webxr scene-viewer');
-          modelViewer.setAttribute('webxr', '');
-          modelViewer.setAttribute('interaction-prompt', 'auto');
-          
-          // محاولة تفعيل AR تلقائياً
-          setTimeout(() => {
-            if (modelViewer.canActivateAR) {
-              modelViewer.activateAR();
-              setArMode(true);
-            } else {
-              // محاولة يدوية للزر
-              try {
-                const shadowRoot = modelViewer.shadowRoot;
-                if (shadowRoot) {
-                  const arButton = shadowRoot.querySelector('[ar-button], .ar-button');
-                  if (arButton) {
-                    arButton.click();
-                    setArMode(true);
-                    return;
-                  }
-                }
-                
-                // إذا فشل، إظهار تعليمات للمستخدم
-                setError('AR requires manual activation on Android. Please tap the AR button when it appears.');
-              } catch (err) {
-                console.log('Error accessing shadow DOM:', err);
+        // إعدادات AR
+        modelViewer.setAttribute('ar', 'true');
+        modelViewer.setAttribute('ar-modes', isAndroid ? 'webxr scene-viewer' : 'scene-viewer quick-look');
+        modelViewer.setAttribute('camera-controls', 'true');
+        modelViewer.setAttribute('auto-rotate', 'true');
+        modelViewer.setAttribute('interaction-prompt', 'when-focused');
+        
+        // إضافة حدث click للزر اليدوي
+        const manualARButton = document.getElementById('manual-ar-button');
+        if (manualARButton) {
+          manualARButton.addEventListener('click', () => {
+            try {
+              if (modelViewer.activateAR) {
+                modelViewer.activateAR();
+                setArMode(true);
+              }
+            } catch (error) {
+              console.error('Failed to activate AR:', error);
+              setError('Failed to activate AR. Please check permissions.');
+            }
+          });
+        }
+        
+        // محاولة تفعيل AR تلقائياً بعد تأخير
+        setTimeout(() => {
+          try {
+            // محاولة الوصول إلى زر AR في shadow DOM
+            const shadowRoot = modelViewer.shadowRoot;
+            if (shadowRoot) {
+              const arButton = shadowRoot.querySelector('[ar-button]');
+              if (arButton) {
+                console.log('AR button found in shadow DOM');
+                arButton.click();
+                setArMode(true);
+                return;
               }
             }
-          }, 1500);
-          
-        } else {
-          // إعدادات iOS والأنظمة الأخرى
-          modelViewer.setAttribute('ar-modes', 'scene-viewer quick-look webxr');
-          
-          if (modelViewer.activateAR) {
-            modelViewer.activateAR();
-            setArMode(true);
-          } else {
-            setTimeout(() => {
-              const arButton = document.querySelector('#auto-ar-button');
-              if (arButton) arButton.click();
-              setArMode(true);
-            }, 1200);
+            
+            // إذا لم يتم العثور على زر، عرض زر يدوي
+            setManualActivation(true);
+            console.log('Manual activation required');
+            
+          } catch (error) {
+            console.log('Error accessing shadow DOM:', error);
+            setManualActivation(true);
           }
-        }
+        }, 2000);
+      } else {
+        setError('Failed to initialize AR viewer');
+        setLoading(false);
       }
     }, 1000);
+  };
+
+  // تفعيل AR يدوياً
+  const handleManualActivate = () => {
+    const modelViewer = document.querySelector('model-viewer');
+    if (modelViewer) {
+      try {
+        modelViewer.activateAR();
+        setArMode(true);
+        setManualActivation(false);
+      } catch (error) {
+        console.error('Manual activation failed:', error);
+        setError('Failed to activate AR. Please ensure camera permissions are granted.');
+      }
+    }
   };
 
   // إدارة زر الإغلاق
@@ -185,7 +210,7 @@ export default function ARViewer({ product, isOpen, onClose }) {
       setArMode(false);
     }
     
-    // تنظيف وإغلاق
+    // تنظيف
     const scripts = document.querySelectorAll('script[src*="model-viewer"]');
     scripts.forEach(script => script.remove());
     window.modelViewerLoaded = false;
@@ -193,8 +218,27 @@ export default function ARViewer({ product, isOpen, onClose }) {
     setTimeout(onClose, 300);
   };
 
-  // كود الحالة الافتراضية عند عدم وجود مودل AR
-  const defaultARModel = "/ar-models/glb/low_poly__sofa.glb";
+  // إعادة المحاولة
+  const handleRetry = () => {
+    setError(null);
+    setLoading(true);
+    setManualActivation(false);
+    
+    setTimeout(() => {
+      // إعادة تحميل المكتبة
+      const script = document.createElement('script');
+      script.type = 'module';
+      script.src = 'https://unpkg.com/@google/model-viewer@1.12.0/dist/model-viewer.min.js';
+      script.onload = () => {
+        window.modelViewerLoaded = true;
+        setTimeout(initializeARViewer, 500);
+      };
+      document.head.appendChild(script);
+    }, 500);
+  };
+
+  // كود الحالة الافتراضية
+  const defaultARModel = "https://modelviewer.dev/shared-assets/models/Astronaut.glb";
 
   if (!isOpen) return null;
 
@@ -237,7 +281,7 @@ export default function ARViewer({ product, isOpen, onClose }) {
           <p className="text-white text-lg font-medium mb-2">AR Experience</p>
           <p className="text-white/60 text-center max-w-md mb-4">{error}</p>
           
-          {/* إظهار معلومات تقنية للمستخدم */}
+          {/* إظهار معلومات تقنية */}
           <div className="bg-black/50 p-4 rounded-lg mb-4 max-w-md">
             <div className="flex items-center mb-2">
               <FontAwesomeIcon icon={faInfoCircle} className="text-[var(--luxury-gold)] mr-2" />
@@ -247,28 +291,40 @@ export default function ARViewer({ product, isOpen, onClose }) {
               <div>Device: {isIOS ? 'iOS' : isAndroid ? 'Android' : 'Desktop'}</div>
               <div>Browser: {browser}</div>
               <div>WebXR Supported: {webXRSupported ? 'Yes' : 'No'}</div>
-              <div>HTTPS: {window.location.protocol === 'https:' ? 'Yes' : 'No (required for Android AR)'}</div>
+              <div>HTTPS: {window.location.protocol === 'https:' ? 'Yes' : 'No'}</div>
+              <div>Protocol: {window.location.protocol}</div>
             </div>
           </div>
           
           <div className="flex space-x-4">
             <button
-              onClick={onClose}
+              onClick={handleClose}
               className="bg-red-500 hover:bg-red-600 text-white px-6 py-2 rounded-lg"
             >
               Close
             </button>
             <button
-              onClick={() => {
-                setError(null);
-                setLoading(true);
-                setTimeout(activateAR, 500);
-              }}
+              onClick={handleRetry}
               className="bg-[var(--luxury-gold)] hover:bg-opacity-90 text-white px-6 py-2 rounded-lg"
             >
+              <FontAwesomeIcon icon={faArrowRotateRight} className="mr-2" />
               Retry
             </button>
           </div>
+        </div>
+      )}
+
+      {/* زر التنشيط اليدوي */}
+      {manualActivation && !loading && !error && (
+        <div className="absolute bottom-24 left-1/2 transform -translate-x-1/2 z-50">
+          <button
+            id="manual-ar-button"
+            onClick={handleManualActivate}
+            className="bg-gradient-to-r from-[var(--luxury-gold)] to-[var(--luxury-copper)] text-white font-bold text-lg px-8 py-4 rounded-2xl shadow-2xl animate-pulse flex items-center space-x-3"
+          >
+            <FontAwesomeIcon icon={faCamera} className="text-xl" />
+            <span>CLICK TO ACTIVATE AR</span>
+          </button>
         </div>
       )}
 
@@ -280,16 +336,15 @@ export default function ARViewer({ product, isOpen, onClose }) {
             src={product?.arGlb || defaultARModel}
             alt={`AR Model of ${product?.name || 'Product'}`}
             ar
-            ar-modes={isAndroid ? "webxr scene-viewer" : "scene-viewer quick-look webxr"}
-            ar-scale="fixed"
+            ar-modes={isAndroid ? "webxr scene-viewer" : "scene-viewer quick-look"}
+            ar-scale="auto"
             camera-controls
             auto-rotate
             camera-orbit="0deg 75deg 105%"
             environment-image="neutral"
             exposure="1"
             shadow-intensity="1"
-            interaction-prompt="auto"
-            interaction-policy="allow-when-focused"
+            interaction-prompt="when-focused"
             style={{
               width: '100%',
               height: '100%',
@@ -299,42 +354,15 @@ export default function ARViewer({ product, isOpen, onClose }) {
               '--ar-button-background': '#D4AF37',
               '--ar-button-color': '#000',
             }}
-            autoplay
-            xr-environment
           >
-            {/* زر AR مخفي يتم الضغط عليه تلقائياً */}
+            {/* زر AR مخفي للاستخدام اليدوي */}
             <button 
               slot="ar-button" 
-              id="auto-ar-button"
-              style={{ 
-                position: 'absolute',
-                bottom: '20px',
-                right: '20px',
-                zIndex: '1000',
-                backgroundColor: '#D4AF37',
-                color: '#000',
-                border: 'none',
-                padding: '10px 20px',
-                borderRadius: '8px',
-                fontWeight: 'bold',
-                cursor: 'pointer',
-                display: isAndroid ? 'block' : 'none'
-              }}
-              onClick={(e) => {
-                e.preventDefault();
-                const modelViewer = document.querySelector('model-viewer');
-                if (modelViewer && modelViewer.activateAR) {
-                  modelViewer.activateAR();
-                  setArMode(true);
-                }
-              }}
+              id="manual-ar-button"
+              style={{ display: 'none' }}
             >
-              {isAndroid ? 'TAP FOR AR' : 'LAUNCH AR'}
+              Activate AR
             </button>
-            
-            <div className="progress-bar" slot="progress-bar">
-              <div className="update-bar"></div>
-            </div>
           </model-viewer>
 
           {/* Instructions Overlay */}
@@ -344,82 +372,24 @@ export default function ARViewer({ product, isOpen, onClose }) {
               <p className="font-medium">Move your device around to place the product</p>
               <p className="text-sm text-white/60 mt-1">Tap on surfaces to place the model</p>
             </div>
+          ) : manualActivation ? (
+            <div className="absolute bottom-32 left-1/2 transform -translate-x-1/2 bg-black/70 text-white p-4 rounded-xl max-w-sm text-center">
+              <FontAwesomeIcon icon={faDesktop} className="text-xl mb-2" />
+              <p className="font-medium">Click the yellow button to activate AR</p>
+              <p className="text-sm text-white/60 mt-1">Make sure to allow camera access</p>
+            </div>
           ) : (
             <div className="absolute bottom-24 left-1/2 transform -translate-x-1/2 bg-black/70 text-white p-4 rounded-xl max-w-sm text-center">
               <FontAwesomeIcon icon={faDesktop} className="text-xl mb-2" />
-              {isAndroid ? (
-                <>
-                  <p className="font-medium">AR requires manual activation</p>
-                  <p className="text-sm text-white/60 mt-1">
-                    {webXRSupported 
-                      ? 'Tap the yellow AR button to start' 
-                      : 'Your browser may not support WebXR'
-                    }
-                  </p>
-                </>
-              ) : (
-                <>
-                  <p className="font-medium">AR will launch automatically</p>
-                  <p className="text-sm text-white/60 mt-1">If not, tap the AR button in the viewer</p>
-                </>
-              )}
+              <p className="font-medium">AR is loading...</p>
+              <p className="text-sm text-white/60 mt-1">Please wait a moment</p>
             </div>
           )}
-
-          {/* Controls Panel */}
-          <div className="absolute bottom-4 left-4 flex flex-col space-y-2">
-            <button
-              onClick={() => setScale(prev => Math.min(prev + 0.1, 2))}
-              className="bg-black/50 hover:bg-black/70 text-white w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-sm"
-              aria-label="Zoom in"
-            >
-              <FontAwesomeIcon icon={faArrowsAlt} />
-            </button>
-            <button
-              onClick={() => setScale(prev => Math.max(prev - 0.1, 0.5))}
-              className="bg-black/50 hover:bg-black/70 text-white w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-sm"
-              aria-label="Zoom out"
-            >
-              <FontAwesomeIcon icon={faCompressAlt} />
-            </button>
-            {product?.arUsdz && isIOS && (
-              <a
-                href={product.arUsdz}
-                download
-                className="bg-black/50 hover:bg-black/70 text-white w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-sm"
-                aria-label="Download USDZ for iOS"
-              >
-                <FontAwesomeIcon icon={faDownload} />
-              </a>
-            )}
-          </div>
 
           {/* Device Specific Instructions */}
           <div className="absolute top-20 left-4 bg-black/60 text-white p-3 rounded-xl max-w-xs">
             <p className="font-medium text-sm mb-1">Instructions:</p>
             <ul className="text-xs space-y-1 text-white/80">
-              {isIOS && (
-                <li className="flex items-start">
-                  <span className="inline-block w-2 h-2 bg-[var(--luxury-gold)] rounded-full mt-1 mr-2"></span>
-                  <span>For best experience, use Safari on iOS</span>
-                </li>
-              )}
-              {isAndroid && (
-                <>
-                  <li className="flex items-start">
-                    <span className="inline-block w-2 h-2 bg-[var(--luxury-gold)] rounded-full mt-1 mr-2"></span>
-                    <span>Use Chrome 81+ for Android AR</span>
-                  </li>
-                  <li className="flex items-start">
-                    <span className="inline-block w-2 h-2 bg-[var(--luxury-gold)] rounded-full mt-1 mr-2"></span>
-                    <span>HTTPS connection required</span>
-                  </li>
-                  <li className="flex items-start">
-                    <span className="inline-block w-2 h-2 bg-[var(--luxury-gold)] rounded-full mt-1 mr-2"></span>
-                    <span>Tap the yellow AR button</span>
-                  </li>
-                </>
-              )}
               <li className="flex items-start">
                 <span className="inline-block w-2 h-2 bg-[var(--luxury-gold)] rounded-full mt-1 mr-2"></span>
                 <span>Allow camera access when prompted</span>
@@ -428,6 +398,12 @@ export default function ARViewer({ product, isOpen, onClose }) {
                 <span className="inline-block w-2 h-2 bg-[var(--luxury-gold)] rounded-full mt-1 mr-2"></span>
                 <span>Move slowly for better tracking</span>
               </li>
+              {requiresHTTPS && (
+                <li className="flex items-start">
+                  <span className="inline-block w-2 h-2 bg-red-500 rounded-full mt-1 mr-2"></span>
+                  <span className="text-red-300">HTTPS required for Android AR</span>
+                </li>
+              )}
             </ul>
           </div>
         </>

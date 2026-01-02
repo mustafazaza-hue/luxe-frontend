@@ -41,13 +41,31 @@ export default function AdminLogin() {
 
   // التحقق إذا كان المستخدم مسجل دخول بالفعل
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const token = localStorage.getItem('token');
-      const userType = localStorage.getItem('userType');
-      if (token && userType === 'admin') {
-        router.push("/dashboard");
+    const checkAuth = () => {
+      if (typeof window !== 'undefined') {
+        try {
+          // تحقق من localStorage أولاً
+          let token = localStorage.getItem('token');
+          let userType = localStorage.getItem('userType');
+          
+          // إذا لم يكن هناك توكن في localStorage، تحقق من sessionStorage
+          if (!token) {
+            token = sessionStorage.getItem('token');
+            userType = sessionStorage.getItem('userType');
+          }
+          
+          if (token && userType === 'admin') {
+            router.push("/dashboard");
+          }
+        } catch (err) {
+          console.log("Error checking auth:", err);
+        }
       }
-    }
+    };
+
+    // تأخير لضمان تحميل window object
+    const timer = setTimeout(checkAuth, 200);
+    return () => clearTimeout(timer);
   }, [router]);
 
   const handlePasswordToggle = () => setShowPassword(!showPassword);
@@ -103,18 +121,45 @@ export default function AdminLogin() {
     
     // حالة تسجيل الدخول الناجح مع توكن
     if (data.token || data.accessToken) {
-      localStorage.setItem("token", data.token || data.accessToken);
-      localStorage.setItem("user", JSON.stringify(data.user || data));
-      localStorage.setItem("userType", "admin");
+      const token = data.token || data.accessToken;
+      const userData = JSON.stringify(data.user || data);
+      
+      // حفظ البيانات في أماكن متعددة للتأمين
+      try {
+        localStorage.setItem("token", token);
+        localStorage.setItem("user", userData);
+        localStorage.setItem("userType", "admin");
+        
+        // حفظ في sessionStorage أيضاً
+        sessionStorage.setItem("token", token);
+        sessionStorage.setItem("user", userData);
+        sessionStorage.setItem("userType", "admin");
+        
+        // حفظ في متغير مؤقت أيضاً
+        if (typeof window !== 'undefined') {
+          window.__AUTH_TOKEN = token;
+        }
+      } catch (storageError) {
+        console.log("Storage error:", storageError);
+      }
+      
       handleSuccessfulLogin(data);
       return 'SUCCESS';
     }
     
     // حالة تسجيل الدخول الناجح بدون توكن (تطوير/اختبار)
     if (data.email || data.id) {
-      localStorage.setItem("token", data.token || `demo-${Date.now()}`);
-      localStorage.setItem("user", JSON.stringify(data));
+      const token = data.token || `demo-${Date.now()}`;
+      const userData = JSON.stringify(data);
+      
+      localStorage.setItem("token", token);
+      localStorage.setItem("user", userData);
       localStorage.setItem("userType", "admin");
+      
+      sessionStorage.setItem("token", token);
+      sessionStorage.setItem("user", userData);
+      sessionStorage.setItem("userType", "admin");
+      
       handleSuccessfulLogin(data);
       return 'SUCCESS_DEMO';
     }
@@ -157,9 +202,16 @@ export default function AdminLogin() {
 
       if (response.id || response.email) {
         // حفظ بيانات المستخدم
-        localStorage.setItem("token", response.token || `demo-${Date.now()}`);
-        localStorage.setItem("user", JSON.stringify(response));
+        const token = response.token || `demo-${Date.now()}`;
+        const userData = JSON.stringify(response);
+        
+        localStorage.setItem("token", token);
+        localStorage.setItem("user", userData);
         localStorage.setItem("userType", "admin");
+        
+        sessionStorage.setItem("token", token);
+        sessionStorage.setItem("user", userData);
+        sessionStorage.setItem("userType", "admin");
         
         handleSuccessfulLogin(response);
       } else {
@@ -177,9 +229,16 @@ export default function AdminLogin() {
       console.log("2FA verification response:", response);
 
       if (response.token) {
-        localStorage.setItem("token", response.token);
-        localStorage.setItem("user", JSON.stringify(response.user || response));
+        const token = response.token;
+        const userData = JSON.stringify(response.user || response);
+        
+        localStorage.setItem("token", token);
+        localStorage.setItem("user", userData);
         localStorage.setItem("userType", "admin");
+        
+        sessionStorage.setItem("token", token);
+        sessionStorage.setItem("user", userData);
+        sessionStorage.setItem("userType", "admin");
         
         handleSuccessfulLogin(response);
       } else {
@@ -193,9 +252,29 @@ export default function AdminLogin() {
 
   const handleSuccessfulLogin = (data) => {
     setSuccess("تم تسجيل الدخول بنجاح! يتم توجيهك...");
+    
+    // تحديد التأخير بناءً على البيئة
+    const isVercel = typeof window !== 'undefined' && 
+                    (window.location.hostname.includes('vercel.app') || 
+                     window.location.hostname.includes('.vercel'));
+    
+    const delay = isVercel ? 2500 : 1500;
+    
     setTimeout(() => {
-      router.push("/dashboard");
-    }, 1500);
+      // تحقق مرة أخرى قبل التوجيه
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      
+      if (token) {
+        // استخدم window.location.href للتأكد من التوجيه
+        window.location.href = "/dashboard";
+      } else {
+        // إعادة المحاولة
+        const newToken = data.token || data.accessToken || `demo-${Date.now()}`;
+        localStorage.setItem("token", newToken);
+        sessionStorage.setItem("token", newToken);
+        window.location.href = "/dashboard";
+      }
+    }, delay);
   };
 
   const handleLoginError = (error) => {
@@ -609,7 +688,7 @@ export default function AdminLogin() {
                 2FA Mode: {requires2FA ? "Active" : "Inactive"}
               </p>
               <p className="text-xs text-gray-500 mt-1">
-                Using: Centralized authApi module
+                Storage: localStorage + sessionStorage
               </p>
             </div>
 
@@ -696,4 +775,4 @@ export default function AdminLogin() {
       </div>
     </div>
   );
-}
+} 

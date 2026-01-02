@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
   faBell,
@@ -13,7 +14,10 @@ import {
   faTruck,
   faArrowUp,
   faBox,
-  faExclamationTriangle
+  faExclamationTriangle,
+  faSpinner,
+  faSignOutAlt,
+  faUser
 } from '@fortawesome/free-solid-svg-icons';
 import { 
   PieChart, Pie, Cell, ResponsiveContainer, 
@@ -33,7 +37,8 @@ const getAuthHeaders = () => {
     };
   }
   
-  const token = localStorage.getItem('authToken');
+  // تحقق من sessionStorage أولاً، ثم localStorage
+  const token = sessionStorage.getItem('token') || localStorage.getItem('token');
   return {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
@@ -42,9 +47,11 @@ const getAuthHeaders = () => {
 };
 
 export default function DashboardPage() {
+  const router = useRouter();
   const [notificationCount] = useState(5);
   const [timeRange, setTimeRange] = useState('Last 7 days');
   const [isChartLoaded, setIsChartLoaded] = useState(false);
+  const [user, setUser] = useState(null);
   
   // States للبيانات من الـ API
   const [dashboardSummary, setDashboardSummary] = useState(null);
@@ -54,10 +61,62 @@ export default function DashboardPage() {
   const [categoryStats, setCategoryStats] = useState([]);
   const [stockAlerts, setStockAlerts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [authLoading, setAuthLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // التحقق من المصادقة أولاً
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        // تحقق من التوكن في أماكن متعددة
+        const token = sessionStorage.getItem('token') || localStorage.getItem('token');
+        
+        if (!token) {
+          console.log('No token found, redirecting to login...');
+          router.push('/adminlogin');
+          return;
+        }
+        
+        // تحقق من صحة التوكن
+        try {
+          const userData = sessionStorage.getItem('user') || localStorage.getItem('user');
+          if (userData) {
+            setUser(JSON.parse(userData));
+          }
+        } catch (err) {
+          console.log('Error parsing user data:', err);
+        }
+        
+        setAuthLoading(false);
+      } catch (error) {
+        console.error('Auth check failed:', error);
+        router.push('/adminlogin');
+      }
+    };
+
+    checkAuth();
+  }, [router]);
+
+  // تسجيل الخروج
+  const handleLogout = () => {
+    // مسح جميع بيانات المصادقة
+    sessionStorage.clear();
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    localStorage.removeItem('userType');
+    
+    // مسح المتغير المؤقت
+    if (typeof window !== 'undefined') {
+      delete window.__AUTH_TOKEN;
+    }
+    
+    router.push('/adminlogin');
+  };
 
   // Fetch dashboard data from API
   useEffect(() => {
+    if (authLoading) return; // انتظر حتى انتهاء التحقق من المصادقة
+
     const fetchDashboardData = async () => {
       try {
         setLoading(true);
@@ -179,7 +238,7 @@ export default function DashboardPage() {
     };
 
     fetchDashboardData();
-  }, []);
+  }, [authLoading]);
 
   // تحويل بيانات الإيرادات للرسم البياني
   const salesData = revenueTrend.map(item => ({
@@ -236,7 +295,7 @@ export default function DashboardPage() {
     }
   ];
 
-  // نشاطات حديثة (يمكن جلبها من API مستقبلاً)
+  // نشاطات حديثة
   const recentActivities = [
     {
       id: 1,
@@ -267,12 +326,12 @@ export default function DashboardPage() {
     }
   ];
 
-  if (loading) {
+  if (authLoading || loading) {
     return (
       <div className="min-h-screen bg-[var(--soft-gray)] flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[var(--luxury-gold)] mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading dashboard data...</p>
+          <p className="text-gray-600">{authLoading ? 'Checking authentication...' : 'Loading dashboard data...'}</p>
         </div>
       </div>
     );
@@ -280,8 +339,49 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-[var(--soft-gray)]">
+      {/* Top Navigation Bar */}
+      <div className="bg-white shadow-sm">
+        <div className="max-w-7xl mx-auto px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-bold text-[var(--charcoal)]">Dashboard</h1>
+              <p className="text-gray-600 text-sm">Welcome back, {user?.name || user?.email || 'Admin'}!</p>
+            </div>
+            
+            <div className="flex items-center space-x-4">
+              {/* Notifications */}
+              <button className="relative p-2 text-gray-600 hover:text-[var(--luxury-gold)] transition-colors">
+                <FontAwesomeIcon icon={faBell} className="text-xl" />
+                {notificationCount > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                    {notificationCount}
+                  </span>
+                )}
+              </button>
+              
+              {/* User Profile */}
+              <div className="flex items-center space-x-3">
+                <div className="bg-[var(--luxury-gold)] text-white w-10 h-10 rounded-full flex items-center justify-center">
+                  <FontAwesomeIcon icon={faUser} />
+                </div>
+                <div>
+                  <p className="font-medium text-[var(--charcoal)]">{user?.name || user?.email || 'Admin User'}</p>
+                  <p className="text-xs text-gray-500">Administrator</p>
+                </div>
+                <button 
+                  onClick={handleLogout}
+                  className="ml-4 px-4 py-2 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg flex items-center space-x-2 transition-colors"
+                >
+                  <FontAwesomeIcon icon={faSignOutAlt} />
+                  <span>Logout</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <main className="max-w-7xl mx-auto px-6 py-8">
-        
         {/* Dashboard Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-[var(--charcoal)] mb-2">Dashboard Overview</h1>
@@ -551,4 +651,4 @@ export default function DashboardPage() {
       </main>
     </div>
   );
-}
+} 
