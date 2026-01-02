@@ -5,7 +5,7 @@ export function middleware(request) {
   const { pathname } = request.nextUrl;
 
   // الصفحات المحمية
-  const protectedPaths = ['/dashboard', '/account', '/settings', '/checkout'];
+  const protectedPaths = ['/dashboard', '/account', ];
   
   // إذا كانت الصفحة محمية ولا يوجد token
   if (protectedPaths.some(path => pathname.startsWith(path)) && !token) {

@@ -1,8 +1,32 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-
 import RecommendedProducts from '@/components/RecommendedProducts';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import {
+  faChevronRight,
+  faTriangleExclamation,
+  faCartShopping,
+  faGem,
+  faStar,
+  faCouch,
+  faBed,
+  faChair,
+  faVrCardboard,
+  faMinus,
+  faPlus,
+  faTrash,
+  faArrowLeft,
+  faPlusCircle,
+  faShieldAlt,
+  faTag,
+  faTruck,
+  faLock,
+  faQuestionCircle,
+  faPhone,
+  faCircleInfo,
+  faCommentDots
+} from '@fortawesome/free-solid-svg-icons';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5186';
 
@@ -259,13 +283,6 @@ export default function CartPage() {
       return;
     }
     
-    // const token = localStorage.getItem('authToken');
-    // if (!token) {
-    //   alert('Please login to proceed to checkout');
-    //   window.location.href = '/login?redirect=/cart';
-    //   return;
-    // }
-    
     window.location.href = '/checkout';
   };
 
@@ -311,7 +328,7 @@ export default function CartPage() {
         <div className="max-w-7xl mx-auto px-6 py-12">
           <div className="flex items-center space-x-2 text-sm mb-8">
             <div className="h-4 bg-gray-200 rounded w-24 animate-pulse"></div>
-            <i className="fa-solid fa-chevron-right text-gray-400 text-xs"></i>
+            <FontAwesomeIcon icon={faChevronRight} className="text-gray-400 text-xs" />
             <div className="h-4 bg-gray-200 rounded w-32 animate-pulse"></div>
           </div>
           
@@ -352,7 +369,7 @@ export default function CartPage() {
       <div className="min-h-screen bg-[var(--soft-gray)]">
         <div className="max-w-7xl mx-auto px-6 py-12">
           <div className="bg-white rounded-2xl p-8 text-center shadow-sm">
-            <i className="fa-solid fa-triangle-exclamation text-4xl text-yellow-500 mb-4"></i>
+            <FontAwesomeIcon icon={faTriangleExclamation} className="text-4xl text-yellow-500 mb-4" />
             <h2 className="text-2xl font-bold text-[var(--charcoal)] mb-2">Oops! Something went wrong</h2>
             <p className="text-gray-600 mb-4">{error}</p>
             <p className="text-gray-500 text-sm mb-6">Displaying demo cart items for now</p>
@@ -378,13 +395,13 @@ export default function CartPage() {
             {/* Breadcrumb */}
             <div className="flex items-center space-x-2 text-sm mb-8">
               <a href="/" className="text-gray-500 hover:text-[var(--luxury-gold)] transition-colors">Home</a>
-              <i className="fa-solid fa-chevron-right text-gray-400 text-xs"></i>
+              <FontAwesomeIcon icon={faChevronRight} className="text-gray-400 text-xs" />
               <span className="text-[var(--charcoal)] font-medium">Shopping Cart</span>
             </div>
 
             <div className="bg-white rounded-2xl p-12 text-center shadow-sm">
               <div className="w-24 h-24 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-6">
-                <i className="fa-solid fa-cart-shopping text-3xl text-gray-400"></i>
+                <FontAwesomeIcon icon={faCartShopping} className="text-3xl text-gray-400" />
               </div>
               
               <h1 className="text-3xl font-bold text-[var(--charcoal)] mb-3">Your cart is empty</h1>
@@ -397,14 +414,14 @@ export default function CartPage() {
                   href="/categories" 
                   className="inline-block bg-[var(--luxury-gold)] hover:bg-opacity-90 text-white px-8 py-4 rounded-xl font-semibold text-lg transition-all shadow-lg hover:shadow-xl"
                 >
-                  <i className="fa-solid fa-gem mr-2"></i>
+                  <FontAwesomeIcon icon={faGem} className="mr-2" />
                   Browse Collections
                 </a>
                 <a 
                   href="/products/featured" 
                   className="inline-block border-2 border-[var(--luxury-gold)] text-[var(--luxury-gold)] hover:bg-[var(--luxury-gold)] hover:text-white px-8 py-4 rounded-xl font-semibold text-lg transition-all"
                 >
-                  <i className="fa-solid fa-star mr-2"></i>
+                  <FontAwesomeIcon icon={faStar} className="mr-2" />
                   View Featured Items
                 </a>
               </div>
@@ -412,16 +429,16 @@ export default function CartPage() {
               <div className="mt-8 pt-8 border-t border-gray-200">
                 <h3 className="text-lg font-semibold text-[var(--charcoal)] mb-4">Not sure where to start?</h3>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-2xl mx-auto">
-                  <a href="/categories/living-room" className="text-[var(--luxury-gold)] hover:underline">
-                    <i className="fa-solid fa-couch mr-2"></i>
+                  <a href="/categories/living-room" className="text-[var(--luxury-gold)] hover:underline font-medium">
+                    <FontAwesomeIcon icon={faCouch} className="mr-2" />
                     Living Room
                   </a>
-                  <a href="/categories/bedroom" className="text-[var(--luxury-gold)] hover:underline">
-                    <i className="fa-solid fa-bed mr-2"></i>
+                  <a href="/categories/bedroom" className="text-[var(--luxury-gold)] hover:underline font-medium">
+                    <FontAwesomeIcon icon={faBed} className="mr-2" />
                     Bedroom
                   </a>
-                  <a href="/categories/office" className="text-[var(--luxury-gold)] hover:underline">
-                    <i className="fa-solid fa-chair mr-2"></i>
+                  <a href="/categories/office" className="text-[var(--luxury-gold)] hover:underline font-medium">
+                    <FontAwesomeIcon icon={faChair} className="mr-2" />
                     Office
                   </a>
                 </div>
@@ -446,7 +463,7 @@ export default function CartPage() {
           {/* Breadcrumb */}
           <div className="flex items-center space-x-2 text-sm mb-8">
             <a href="/" className="text-gray-500 hover:text-[var(--luxury-gold)] transition-colors">Home</a>
-            <i className="fa-solid fa-chevron-right text-gray-400 text-xs"></i>
+            <FontAwesomeIcon icon={faChevronRight} className="text-gray-400 text-xs" />
             <span className="text-[var(--charcoal)] font-medium">Shopping Cart</span>
           </div>
 
@@ -486,7 +503,7 @@ export default function CartPage() {
                         )}
                         {item.features && item.features.includes('AR Ready') && (
                           <span className="text-sm bg-blue-50 text-blue-700 px-3 py-1 rounded-full">
-                            <i className="fa-solid fa-vr-cardboard mr-1"></i> AR Ready
+                            <FontAwesomeIcon icon={faVrCardboard} className="mr-1" /> AR Ready
                           </span>
                         )}
                       </div>
@@ -501,7 +518,7 @@ export default function CartPage() {
                               onClick={() => handleQuantityChange(item.id, item.quantity - 1)}
                               className="w-10 h-10 flex items-center justify-center text-gray-500 hover:text-[var(--luxury-gold)]"
                             >
-                              <i className="fa-solid fa-minus"></i>
+                              <FontAwesomeIcon icon={faMinus} />
                             </button>
                             <span className="w-12 text-center font-medium text-[var(--charcoal)]">
                               {item.quantity}
@@ -510,7 +527,7 @@ export default function CartPage() {
                               onClick={() => handleQuantityChange(item.id, item.quantity + 1)}
                               className="w-10 h-10 flex items-center justify-center text-gray-500 hover:text-[var(--luxury-gold)]"
                             >
-                              <i className="fa-solid fa-plus"></i>
+                              <FontAwesomeIcon icon={faPlus} />
                             </button>
                           </div>
                         </div>
@@ -518,7 +535,7 @@ export default function CartPage() {
                           onClick={() => handleRemoveItem(item.id)}
                           className="text-red-500 hover:text-red-700 font-medium flex items-center space-x-2"
                         >
-                          <i className="fa-solid fa-trash"></i>
+                          <FontAwesomeIcon icon={faTrash} />
                           <span>Remove</span>
                         </button>
                       </div>
@@ -533,12 +550,12 @@ export default function CartPage() {
                   href="/categories" 
                   className="text-[var(--luxury-gold)] hover:text-[var(--warm-copper)] font-semibold flex items-center space-x-2 transition-colors group"
                 >
-                  <i className="fa-solid fa-arrow-left group-hover:-translate-x-1 transition-transform"></i>
+                  <FontAwesomeIcon icon={faArrowLeft} className="group-hover:-translate-x-1 transition-transform" />
                   <span>Continue Shopping</span>
                 </a>
                 
                 <div className="flex items-center space-x-6">
-                  <button 
+                  {/* <button 
                     onClick={() => {
                       const addItem = window.confirm('Add sample item for testing?');
                       if (addItem) {
@@ -557,15 +574,15 @@ export default function CartPage() {
                     }}
                     className="text-blue-600 hover:text-blue-800 font-medium flex items-center space-x-2 transition-colors text-sm"
                   >
-                    <i className="fa-solid fa-plus-circle"></i>
+                    <FontAwesomeIcon icon={faPlusCircle} />
                     <span>Add Test Item</span>
-                  </button>
+                  </button> */}
                   
                   <button 
                     onClick={handleClearCart}
                     className="text-red-600 hover:text-red-800 font-semibold flex items-center space-x-2 transition-colors"
                   >
-                    <i className="fa-solid fa-trash"></i>
+                    <FontAwesomeIcon icon={faTrash} />
                     <span>Clear Cart</span>
                   </button>
                 </div>
@@ -574,7 +591,7 @@ export default function CartPage() {
               {/* Security Note */}
               <div className="bg-blue-50 border border-blue-200 rounded-2xl p-6 mt-8">
                 <div className="flex items-start space-x-4">
-                  <i className="fa-solid fa-shield-alt text-blue-500 text-xl mt-1"></i>
+                  <FontAwesomeIcon icon={faShieldAlt} className="text-blue-500 text-xl mt-1" />
                   <div>
                     <h4 className="font-bold text-blue-800 mb-2">Secure Shopping</h4>
                     <p className="text-blue-700">
@@ -634,7 +651,7 @@ export default function CartPage() {
                 {/* Coupon Section */}
                 <div className="mb-8">
                   <div className="flex items-center mb-4">
-                    <i className="fa-solid fa-tag text-[var(--luxury-gold)] mr-2"></i>
+                    <FontAwesomeIcon icon={faTag} className="text-[var(--luxury-gold)] mr-2" />
                     <h4 className="font-semibold text-[var(--charcoal)]">Have a coupon?</h4>
                   </div>
                   <div className="flex gap-2">
@@ -666,7 +683,7 @@ export default function CartPage() {
                 {/* Shipping Calculator */}
                 <div className="mb-8">
                   <div className="flex items-center mb-4">
-                    <i className="fa-solid fa-truck text-[var(--luxury-gold)] mr-2"></i>
+                    <FontAwesomeIcon icon={faTruck} className="text-[var(--luxury-gold)] mr-2" />
                     <h4 className="font-semibold text-[var(--charcoal)]">Estimate Shipping</h4>
                   </div>
                   <div className="space-y-4">
@@ -713,7 +730,7 @@ export default function CartPage() {
                 </a>
                 
                 <p className="text-xs text-gray-500 text-center mt-6">
-                  <i className="fa-solid fa-lock mr-1"></i>
+                  <FontAwesomeIcon icon={faLock} className="mr-1" />
                   Your payment information is encrypted and secure
                 </p>
               </div>
@@ -721,7 +738,7 @@ export default function CartPage() {
               {/* Delivery Info Card */}
               <div className="bg-gradient-to-r from-[var(--luxury-gold)] to-[var(--warm-copper)] rounded-2xl p-8 mt-8 text-white shadow-lg">
                 <div className="flex items-start space-x-4 mb-6">
-                  <i className="fa-solid fa-truck text-2xl"></i>
+                  <FontAwesomeIcon icon={faTruck} className="text-2xl" />
                   <div>
                     <h3 className="font-bold text-lg mb-2">Free Delivery</h3>
                     <p className="text-sm opacity-90">On orders over $2,000</p>
@@ -736,7 +753,7 @@ export default function CartPage() {
                   </div>
                 </div>
                 <div className="flex items-start space-x-4">
-                  <i className="fa-solid fa-shield-alt text-2xl"></i>
+                  <FontAwesomeIcon icon={faShieldAlt} className="text-2xl" />
                   <div>
                     <h3 className="font-bold text-lg mb-2">Secure Payment</h3>
                     <p className="text-sm opacity-90">100% secure transactions</p>
@@ -747,7 +764,7 @@ export default function CartPage() {
               {/* Need Help? */}
               <div className="bg-white rounded-2xl p-6 mt-8 border border-gray-200 shadow-sm">
                 <h3 className="font-bold text-[var(--charcoal)] mb-4 flex items-center">
-                  <i className="fa-solid fa-question-circle text-[var(--luxury-gold)] mr-3"></i>
+                  <FontAwesomeIcon icon={faQuestionCircle} className="text-[var(--luxury-gold)] mr-3" />
                   Need Help?
                 </h3>
                 <p className="text-gray-600 mb-6">
@@ -755,18 +772,18 @@ export default function CartPage() {
                 </p>
                 <div className="space-y-3">
                   <a href="/contact" className="block text-[var(--luxury-gold)] hover:underline font-medium">
-                    <i className="fa-solid fa-phone mr-3"></i>
+                    <FontAwesomeIcon icon={faPhone} className="mr-3" />
                     Contact Support
                   </a>
                   <a href="/faq" className="block text-[var(--luxury-gold)] hover:underline font-medium">
-                    <i className="fa-solid fa-circle-info mr-3"></i>
+                    <FontAwesomeIcon icon={faCircleInfo} className="mr-3" />
                     View FAQ
                   </a>
                   <button 
                     onClick={() => alert('Live chat coming soon!')}
                     className="block text-[var(--luxury-gold)] hover:underline font-medium w-full text-left"
                   >
-                    <i className="fa-solid fa-comment-dots mr-3"></i>
+                    <FontAwesomeIcon icon={faCommentDots} className="mr-3" />
                     Live Chat
                   </button>
                 </div>
