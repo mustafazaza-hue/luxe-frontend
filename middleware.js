@@ -5,12 +5,12 @@ export function middleware(request) {
   const { pathname } = request.nextUrl;
 
   // الصفحات المحمية
-  const protectedPaths = ['/dashboard', '/account', ];
+  // const protectedPaths = ['/dashboard', '/account', ];
   
-  // إذا كانت الصفحة محمية ولا يوجد token
-  if (protectedPaths.some(path => pathname.startsWith(path)) && !token) {
-    return NextResponse.redirect(new URL('/login', request.url));
-  }
+  // // إذا كانت الصفحة محمية ولا يوجد token
+  // if (protectedPaths.some(path => pathname.startsWith(path)) && !token) {
+  //   return NextResponse.redirect(new URL('/login', request.url));
+  // }
 
   // إذا كان المستخدم مسجل دخول ويحاول الوصول إلى صفحات التسجيل
   if ((pathname === '/login' || pathname === '/signup') && token) {
